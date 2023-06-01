@@ -1,0 +1,5 @@
+
+
+set_env_variables.data_root = "/home/morashed/repo/6D-Pose-Estimation-for-Unseen-Categories/data"
+
+set_env_variables.render_data_name = "bop_shapenet_sample"
