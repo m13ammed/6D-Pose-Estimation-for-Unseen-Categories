@@ -97,9 +97,15 @@ class base_object_dataset(Dataset):
             CAD_ver =   np.asarray(CAD_mesh.vertices)*obj_dict['scale_cad'] #0.1
             align_pc = self.transform(pcd, obj_dict['R_m2c'], obj_dict['t_m2c'], inv=True) 
             P = self.find_positives(CAD_ver, align_pc, r = 0.2)
+            p_new = np.argwhere(P)
+            l2 = pcd.shape[0]
+            l1 = CAD_ver.shape[0]
+            overlap_12, overlap_21 = self.get_overlap(l1,l2,p_new)
             obj_dict.update({
                 'align_pc': align_pc,
-                'P': np.argwhere(P)
+                'P': p_new,
+                'overlap_12':overlap_12,
+                'overlap_21': overlap_21,
             })
 
             if cache: np.savez(obj_filename, **obj_dict)
@@ -128,6 +134,9 @@ class base_object_dataset(Dataset):
                 #"L" :       CAD_L , 
                 "evals" :   CAD_evals , 
                 "evecs" :   CAD_evecs , 
+                "CAD_ver": CAD_ver,
+                "CAD_faces": CAD_faces,
+                "CAD_norm": CAD_norm,
                 #"gradX" :   CAD_gradX , 
                 #"gradY" :   CAD_gradY 
             }
@@ -171,3 +180,11 @@ class base_object_dataset(Dataset):
             return pc @ R + t
         else:
             return pc @ R.T + t
+
+    def get_overlap (self,l_1, l_2, p):
+        overlap_12 = np.zeros((l_1), dtype=np.byte)
+        overlap_21 = np.zeros((l_2), dtype=np.byte)
+        overlap_12[p[:,0]] = 1
+        overlap_21[p[:,1]] = 1
+
+        return overlap_12, overlap_21
