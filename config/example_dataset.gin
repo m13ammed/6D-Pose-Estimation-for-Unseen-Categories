@@ -8,4 +8,4 @@ base_object_dataset.num_samples = -1
 base_object_dataset.min_vis = 0.5
 
 base_object_dataset.cache_dir = '/home/morashed/repo'
-base_object_dataset.LBO_pc = false
+base_object_dataset.LBO_pc = False
