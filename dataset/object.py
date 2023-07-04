@@ -7,6 +7,7 @@ from .scene import base_scene_dataset
 import numpy as np
 import os
 import gin
+import copy 
 
 @gin.configurable()
 class base_object_dataset(Dataset):
@@ -55,6 +56,7 @@ class base_object_dataset(Dataset):
     def __getitem__(self, index):
         i,j = self.mapping_list[index]
         CAD_mesh = None
+        sparse_keys = ["L", "gradX", "gradY"]
         if self.cache_dir is not None:
             cache = True
             base_name = f'min_vis_{self.min_vis}_{i}_{j}_'
@@ -116,6 +118,8 @@ class base_object_dataset(Dataset):
 
         if CAD_filename.exists() and cache: 
             CAD_LBO_dict = dict(np.load(CAD_filename, allow_pickle=True))
+            CAD_LBO_dict = self.dict_to_tensor(CAD_LBO_dict, sparse_keys)
+
         else:
             
             CAD_mesh = o3d.io.read_triangle_mesh(str(cad_path)) if CAD_mesh is None else CAD_mesh
@@ -131,32 +135,40 @@ class base_object_dataset(Dataset):
             CAD_LBO_dict = {
                 "frames" :  CAD_frames ,
                 "mass" :    CAD_mass , 
-                #"L" :       CAD_L , 
                 "evals" :   CAD_evals , 
                 "evecs" :   CAD_evecs , 
                 "CAD_ver": CAD_ver,
                 "CAD_faces": CAD_faces,
                 "CAD_norm": CAD_norm,
-                #"gradX" :   CAD_gradX , 
-                #"gradY" :   CAD_gradY 
-            }
-            if cache: np.savez(CAD_filename, **CAD_LBO_dict)
+                "gradX" :   CAD_gradX , 
+                "gradY" :   CAD_gradY ,
+                "L" : CAD_L
+            } 
+            
+            
+            if cache: 
+                CAD_LBO_dict_save = self.save_sparse_tensor(copy.deepcopy(CAD_LBO_dict), sparse_keys)
+                np.savez(CAD_filename, **CAD_LBO_dict_save)
+
         if self.LBO_pc:
             if pc_filename.exists() and cache: 
                 pcd_LBO_dict = dict(np.load(pc_filename, allow_pickle=True))
+                pcd_LBO_dict = self.dict_to_tensor(pcd_LBO_dict, sparse_keys)
             else:
                 pcd_frames, pcd_mass, pcd_L, pcd_evals, pcd_evecs, pcd_gradX, pcd_gradY = geometry.get_operators(verts=torch.Tensor(pcd), faces=torch.Tensor([])) #for future utilize cahcing add caching to reading of gt json 
 
                 pcd_LBO_dict = {
                     "frames" :  pcd_frames ,
                     "mass" :    pcd_mass , 
-                    #"L" :       pcd_L, 
+                    "L" :       pcd_L, 
                     "evals" :   pcd_evals , 
                     "evecs" :   pcd_evecs , 
-                    #"gradX" :   pcd_gradX , 
-                    #"gradY" :   pcd_gradY 
+                    "gradX" :   pcd_gradX , 
+                    "gradY" :   pcd_gradY 
                 }
-                if cache: np.savez(pc_filename, **pcd_LBO_dict)
+                if cache: 
+                    pcd_LBO_dict_save = self.save_sparse_tensor(copy.deepcopy(pcd_LBO_dict), sparse_keys)
+                    np.savez(pc_filename, **pcd_LBO_dict_save)
         else:
             pcd_LBO_dict = None
 
@@ -188,3 +200,24 @@ class base_object_dataset(Dataset):
         overlap_21[p[:,1]] = 1
 
         return overlap_12, overlap_21
+    def save_sparse_tensor(self, dict, keys):
+        for key in keys:
+            tensor_ = dict.pop(key)
+            dict.update({
+                key+'_idx': tensor_.indices(),
+                key+'_val': tensor_.values(),
+            })
+        return dict
+    def dict_to_tensor(self, dict, keys):
+        shape = dict['evecs'].shape[0]
+        shape = (shape,shape)
+        for key in keys:
+            idx = dict.pop(key+'_idx')
+            val = dict.pop(key+'_val')
+
+            tensor_ = torch.sparse_coo_tensor(idx, val, shape)
+
+            dict.update({
+                key: tensor_
+            })
+        return dict
