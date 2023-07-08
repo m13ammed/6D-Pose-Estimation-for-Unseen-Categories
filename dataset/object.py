@@ -8,6 +8,7 @@ import numpy as np
 import os
 import gin
 import copy 
+from sklearn.neighbors import BallTree
 
 @gin.configurable()
 class base_object_dataset(Dataset):
@@ -98,8 +99,9 @@ class base_object_dataset(Dataset):
             CAD_mesh = o3d.io.read_triangle_mesh(str(cad_path))
             CAD_ver =   np.asarray(CAD_mesh.vertices)*obj_dict['scale_cad'] #0.1
             align_pc = self.transform(pcd, obj_dict['R_m2c'], obj_dict['t_m2c'], inv=True) 
-            P = self.find_positives(CAD_ver, align_pc, r = 0.2)
-            p_new = np.argwhere(P)
+            #P = self.find_positives(CAD_ver, align_pc, r = 0.2)
+            #p_new = np.argwhere(P)
+            p_new = self.find_positives(CAD_ver, align_pc, r = 0.2)
             l2 = pcd.shape[0]
             l1 = CAD_ver.shape[0]
             overlap_12, overlap_21 = self.get_overlap(l1,l2,p_new)
@@ -180,12 +182,26 @@ class base_object_dataset(Dataset):
 
     def find_positives(self, pc1, pc2, r=0.2):
         # Compute pairwise Euclidean distances between all pairs of points
-        distances = np.linalg.norm(pc1[:, np.newaxis] - pc2, axis=2)
+        #distances = np.linalg.norm(pc1[:, np.newaxis] - pc2, axis=2)
 
         # Create a mask of points within the specified radius
-        mask = distances <= r
+        #mask = distances <= r
 
-        return mask.astype(bool)
+        #return mask.astype(bool)
+        
+        #---------memory and speed optimized-----------------
+        
+        # Fit a BallTree model to pc2
+        tree = BallTree(pc2)
+
+        # Find all points in pc1 that have a neighbor in pc2 within distance r
+        indices = tree.query_radius(pc1, r)
+
+        # Create a numpy array of pairs (i, j) where point i in pc1 is within distance r of point j in pc2
+        pairs = np.array([(i, j) for i, js in enumerate(indices) for j in js])
+
+        return pairs
+        
     def transform(self, pc, R, t, inv = False):
         if inv:
             t = -1.0 *t.reshape(1,3) @ R
