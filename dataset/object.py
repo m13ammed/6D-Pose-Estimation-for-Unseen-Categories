@@ -155,7 +155,7 @@ class base_object_dataset(Dataset):
                 pcd_LBO_dict = dict(np.load(pc_filename, allow_pickle=True))
                 pcd_LBO_dict = self.dict_to_tensor(pcd_LBO_dict, sparse_keys)
             else:
-                pcd_frames, pcd_mass, pcd_L, pcd_evals, pcd_evecs, pcd_gradX, pcd_gradY = geometry.get_operators(verts=torch.Tensor(pcd), faces=torch.Tensor([])) #for future utilize cahcing add caching to reading of gt json 
+                pcd_frames, pcd_mass, pcd_L, pcd_evals, pcd_evecs, pcd_gradX, pcd_gradY = geometry.get_operators(verts=torch.Tensor(obj_dict['pcd_depth']), faces=torch.Tensor([])) #for future utilize cahcing add caching to reading of gt json 
 
                 pcd_LBO_dict = {
                     "frames" :  pcd_frames ,
