@@ -15,7 +15,6 @@ class base_object_dataset(Dataset):
     def __init__(self, min_vis=0.25, cache_dir = '/home/morashed/repo', LBO_pc = True, **kwargs):
         self.scenes = base_scene_dataset(**kwargs)
         self.min_vis = min_vis
-        self.collect_obj_data()
         self.cache_dir = cache_dir
         self.LBO_pc = LBO_pc
         if self.cache_dir is not None:
@@ -25,6 +24,7 @@ class base_object_dataset(Dataset):
             self.cache_dir.mkdir(exist_ok=True)
             self.cache_dir = self.cache_dir / self.scenes.mode
             self.cache_dir.mkdir(exist_ok=True)
+        self.collect_obj_data()
         
     def dpt_2_pcld(self, dpt, cam_scale, K, mask):
         idx = np.indices(dpt.shape[:2])
@@ -43,16 +43,27 @@ class base_object_dataset(Dataset):
         return dpt_3d
 
     def collect_obj_data(self):
-        CAD_mesh = None
-        self.mapping_list = []
-        for i, scene in enumerate(self.scenes):
+        #mapping list cache
+        if self.cache_dir is not None:
+            cache = True
+            mapping_list_filename = self.cache_dir / 'mapping_list.npz'
+        if mapping_list_filename.exists() and cache: 
+            self.mapping_list = np.load(mapping_list_filename, allow_pickle=True)['mapping_list']
+        else:
+            #normal collecting
+            CAD_mesh = None
+            self.mapping_list = []
+            print(f"collecting obj data")
+            for i, scene in tqdm(enumerate(self.scenes)):
 
-            for j, obj in enumerate(scene["scene_info"]):
+                for j, obj in enumerate(scene["scene_info"]):
 
-                if obj['visib_fract'] < self.min_vis:
-                    continue
-                else:
-                    self.mapping_list.append((i,j))
+                    if obj['visib_fract'] < self.min_vis:
+                        continue
+                    else:
+                        self.mapping_list.append((i,j))
+        #saving mapping list cache
+        if cache: np.savez(mapping_list_filename, mapping_list=self.mapping_list)
     
     def __getitem__(self, index):
         i,j = self.mapping_list[index]
