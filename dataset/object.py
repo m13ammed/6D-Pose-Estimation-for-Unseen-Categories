@@ -62,8 +62,8 @@ class base_object_dataset(Dataset):
                         continue
                     else:
                         self.mapping_list.append((i,j))
-        #saving mapping list cache
-        if cache: np.savez(mapping_list_filename, mapping_list=self.mapping_list)
+            #saving mapping list cache
+            if cache: np.savez(mapping_list_filename, mapping_list=self.mapping_list)
     
     def __getitem__(self, index):
         i,j = self.mapping_list[index]
