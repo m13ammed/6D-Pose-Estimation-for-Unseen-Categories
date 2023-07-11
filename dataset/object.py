@@ -9,6 +9,7 @@ import os
 import gin
 import copy 
 from sklearn.neighbors import BallTree
+from tqdm import tqdm # TIM STROHMEYER
 
 @gin.configurable()
 class base_object_dataset(Dataset):
@@ -25,7 +26,26 @@ class base_object_dataset(Dataset):
             self.cache_dir = self.cache_dir / self.scenes.mode
             self.cache_dir.mkdir(exist_ok=True)
         self.collect_obj_data()
-        
+
+    def remove_outliers(self, pcd): # TIM STROHMEYER
+        '''
+        nb_neighbors:   num of neighbors to calculate the average distance for a given point.
+        std_ratio:      threshold of average distances across the point cloud. 
+                        lower --> stronger outlier removal
+        '''
+        # Pass xyz to Open3D.o3d.geometry.PointCloud
+        pcd_03d = o3d.geometry.PointCloud()
+        pcd_03d.points = o3d.utility.Vector3dVector(pcd)
+
+        # Statisticial Outlier removal
+        cl, ind = pcd_03d.remove_statistical_outlier(nb_neighbors=20, std_ratio=0.2)
+        inlier_cloud = pcd_03d.select_by_index(ind)
+
+        # Convert Open3D.o3d.geometry.PointCloud to numpy array
+        pcd_clean = np.asarray(inlier_cloud.points)
+
+        return pcd_clean
+
     def dpt_2_pcld(self, dpt, cam_scale, K, mask):
         idx = np.indices(dpt.shape[:2])
         xmap = idx[0]
@@ -92,6 +112,7 @@ class base_object_dataset(Dataset):
             cam_scale = scene["camera"]["depth_scale"]
 
             pcd = self.dpt_2_pcld(depth.T, cam_scale*1000, K, seg_mask)
+            pcd = self.remove_outliers(pcd) # TIM STROHMEYER
 
             gt_info = self.scenes[i]['scene_gt'][j]
 
