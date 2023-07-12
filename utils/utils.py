@@ -1,11 +1,12 @@
 import os 
 import gin
 import numpy as np
+import yaml 
 
 @gin.configurable
 def set_env_variables(**kwargs):
     for key, value in kwargs.items():
-        os.environ[key] = value
+        os.environ[key] = str(value)
 
 
 def quaternion_rotation_matrix(Q):
@@ -48,3 +49,7 @@ def quaternion_rotation_matrix(Q):
                            [r20, r21, r22]])
                             
     return rot_matrix
+
+@gin.configurable
+def yaml_read(path):
+    return yaml.safe_load(open(path, "r"))

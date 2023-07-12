@@ -10,6 +10,7 @@ import gin
 import copy 
 from sklearn.neighbors import BallTree
 from tqdm import tqdm # TIM STROHMEYER
+from DPFM.dpfm.utils import farthest_point_sample, square_distance
 
 @gin.configurable()
 class base_object_dataset(Dataset):
@@ -133,7 +134,7 @@ class base_object_dataset(Dataset):
             align_pc = self.transform(pcd, obj_dict['R_m2c'], obj_dict['t_m2c'], inv=True) 
             #P = self.find_positives(CAD_ver, align_pc, r = 0.2)
             #p_new = np.argwhere(P)
-            p_new = self.find_positives(CAD_ver, align_pc, r = 0.2)
+            p_new = self.find_positives(CAD_ver, align_pc, r = 0.15)
             l2 = pcd.shape[0]
             l1 = CAD_ver.shape[0]
             overlap_12, overlap_21 = self.get_overlap(l1,l2,p_new)
@@ -163,6 +164,11 @@ class base_object_dataset(Dataset):
 
             
 
+            idx0 = farthest_point_sample(CAD_ver.t(), ratio=0.25)
+            dists, idx1 = square_distance(CAD_ver.unsqueeze(0), CAD_ver[idx0].unsqueeze(0)).sort(dim=-1)
+            #dists, idx1 = square_distance(CAD_ver, CAD_ver[idx0])#.sort(dim=-1)
+
+            dists, idx1 = dists[:, :, :130].clone(), idx1[:, :, :130].clone()
 
             CAD_frames, CAD_mass, CAD_L, CAD_evals, CAD_evecs, CAD_gradX, CAD_gradY = geometry.get_operators(verts=CAD_ver, faces=CAD_faces, normals=CAD_norm) #for future utilize cahcing add caching to reading of gt json 
 
@@ -171,12 +177,14 @@ class base_object_dataset(Dataset):
                 "mass" :    CAD_mass , 
                 "evals" :   CAD_evals , 
                 "evecs" :   CAD_evecs , 
-                "CAD_ver": CAD_ver,
-                "CAD_faces": CAD_faces,
-                "CAD_norm": CAD_norm,
+                "xyz": CAD_ver,
+                "faces": CAD_faces,
+                "norm": CAD_norm,
                 "gradX" :   CAD_gradX , 
                 "gradY" :   CAD_gradY ,
-                "L" : CAD_L
+                "L" : CAD_L,
+                "sample_idx": [idx0, idx1, dists]
+
             } 
             
             
@@ -198,7 +206,9 @@ class base_object_dataset(Dataset):
                     "evals" :   pcd_evals , 
                     "evecs" :   pcd_evecs , 
                     "gradX" :   pcd_gradX , 
-                    "gradY" :   pcd_gradY 
+                    "gradY" :   pcd_gradY,
+                    "xyz" : obj_dict['pcd_depth'].astype(np.float32),
+
                 }
                 if cache: 
                     pcd_LBO_dict_save = self.save_sparse_tensor(copy.deepcopy(pcd_LBO_dict), sparse_keys)
