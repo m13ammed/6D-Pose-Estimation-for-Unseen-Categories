@@ -92,7 +92,7 @@ class base_object_dataset(Dataset):
         sparse_keys = ["L", "gradX", "gradY"]
         if self.cache_dir is not None:
             cache = True
-            base_name = f'min_vis_{self.min_vis}_{i}_{j}_'
+            base_name = f'{i}_{j}_'
             CAD_filename = self.cache_dir / (base_name+'CAD_LBO.npz')
             pc_filename = self.cache_dir / (base_name+'pc_LBO.npz')
             obj_filename = self.cache_dir / (base_name+'obj.npz')
@@ -114,10 +114,14 @@ class base_object_dataset(Dataset):
 
             pcd = self.dpt_2_pcld(depth.T, cam_scale*1000, K, seg_mask)
             pcd = self.remove_outliers(pcd) # TIM STROHMEYER
-
+            if pcd.shape[0]>2000:
+                ratio = 2000/pcd.shape[0]
+                idx0 = farthest_point_sample(torch.Tensor(pcd).t(), ratio=ratio)
+                pcd = pcd[idx0]
             gt_info = self.scenes[i]['scene_gt'][j]
 
-            cad_path = Path(os.environ["data_root"]) / self.scenes.render_data_name/"models" /  f"obj_{gt_info['obj_id']:06d}.ply"
+            model_folder = "models" if self.mode.lower() != 'test' else "models_eval"
+            cad_path = Path(os.environ["data_root"]) / self.scenes.render_data_name/ model_folder/  f"obj_{gt_info['obj_id']:06d}.ply"
 
             #load cad here or specifiy transform o3d.io.read_triangle_mesh
             obj_dict = {
@@ -129,12 +133,19 @@ class base_object_dataset(Dataset):
                 'cad_path': cad_path, 
                 'scale_cad': 0.1
             } 
-            CAD_mesh = o3d.io.read_triangle_mesh(str(cad_path))
-            CAD_ver =   np.asarray(CAD_mesh.vertices)*obj_dict['scale_cad'] #0.1
+            if CAD_filename.exists() and cache: 
+                CAD_LBO_dict = dict(np.load(CAD_filename, allow_pickle=True))
+                #CAD_LBO_dict = self.dict_to_tensor(CAD_LBO_dict, sparse_keys)
+                CAD_ver = CAD_LBO_dict['xyz']
+            else:
+
+                CAD_mesh = o3d.io.read_triangle_mesh(str(cad_path))
+                CAD_mesh = CAD_mesh.simplify_quadric_decimation(10000)
+                CAD_ver =   np.asarray(CAD_mesh.vertices)*obj_dict['scale_cad'] #0.1
             align_pc = self.transform(pcd, obj_dict['R_m2c'], obj_dict['t_m2c'], inv=True) 
             #P = self.find_positives(CAD_ver, align_pc, r = 0.2)
             #p_new = np.argwhere(P)
-            p_new = self.find_positives(CAD_ver, align_pc, r = 0.15)
+            p_new = self.find_positives(CAD_ver, align_pc, r = 0.5)
             l2 = pcd.shape[0]
             l1 = CAD_ver.shape[0]
             overlap_12, overlap_21 = self.get_overlap(l1,l2,p_new)
@@ -158,17 +169,18 @@ class base_object_dataset(Dataset):
         else:
             
             CAD_mesh = o3d.io.read_triangle_mesh(str(cad_path)) if CAD_mesh is None else CAD_mesh
+            CAD_mesh = CAD_mesh.simplify_quadric_decimation(10000)
             CAD_ver =   torch.Tensor(np.asarray(CAD_mesh.vertices)*obj_dict['scale_cad'])
             CAD_faces = torch.Tensor(np.asarray(CAD_mesh.triangles)).to(int)
             CAD_norm =  torch.Tensor(np.asarray(CAD_mesh.vertex_normals)*(1/obj_dict['scale_cad']))
 
             
 
-            idx0 = farthest_point_sample(CAD_ver.t(), ratio=0.25)
-            dists, idx1 = square_distance(CAD_ver.unsqueeze(0), CAD_ver[idx0].unsqueeze(0)).sort(dim=-1)
+            #idx0 = farthest_point_sample(CAD_ver.t(), ratio=0.25)
+            #dists, idx1 = square_distance(CAD_ver.unsqueeze(0), CAD_ver[idx0].unsqueeze(0)).sort(dim=-1)
             #dists, idx1 = square_distance(CAD_ver, CAD_ver[idx0])#.sort(dim=-1)
 
-            dists, idx1 = dists[:, :, :130].clone(), idx1[:, :, :130].clone()
+            #dists, idx1 = dists[:, :, :130].clone(), idx1[:, :, :130].clone()
 
             CAD_frames, CAD_mass, CAD_L, CAD_evals, CAD_evecs, CAD_gradX, CAD_gradY = geometry.get_operators(verts=CAD_ver, faces=CAD_faces, normals=CAD_norm) #for future utilize cahcing add caching to reading of gt json 
 
@@ -183,7 +195,7 @@ class base_object_dataset(Dataset):
                 "gradX" :   CAD_gradX , 
                 "gradY" :   CAD_gradY ,
                 "L" : CAD_L,
-                "sample_idx": [idx0, idx1, dists]
+                #"sample_idx": [idx0, idx1, dists]
 
             } 
             
