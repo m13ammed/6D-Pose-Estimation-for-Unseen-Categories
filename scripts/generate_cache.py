@@ -24,8 +24,9 @@ if __name__ == '__main__':
     gin.parse_config_file('/home/morashed/repo/6D-Pose-Estimation-for-Unseen-Categories/config/cache_gen.gin')
     utils.set_env_variables()
     parser = argparse.ArgumentParser()
-    parser.add_argument('slice_idx', type=int, help='Index for list slicing')
-    
+    parser.add_argument('start_idx', type=int, help='Index for list slicing')
+    parser.add_argument('end_idx', type=int, help='Index for list slicing')
+
     dataset = base_object_dataset()
     loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, num_workers = 0, collate_fn = psuedo_collate)
 

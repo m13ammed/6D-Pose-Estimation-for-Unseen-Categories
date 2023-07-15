@@ -1,8 +1,8 @@
 # fmap module params
 fmap:
   n_fmap: 30  # number of eigenvectors used for fmap
-  k_eig: 128  # number of eigenvectors used for diffusion
-  n_feat: 128
+  k_eig: 64  # number of eigenvectors used for diffusion
+  n_feat: 32
   C_in: 3
   lambda_: 100
   resolvant_gamma: 0.5
@@ -10,10 +10,10 @@ fmap:
 
 # attention module params
 attention:
-  num_head: 4
-  gnn_dim: 128
+  num_head: 2
+  gnn_dim: 32
   ref_n_layers: 1
-  cross_sampling_ratio: 0.2
+  cross_sampling_ratio: 1.0
   attention_type: normal
 
 # overlap module

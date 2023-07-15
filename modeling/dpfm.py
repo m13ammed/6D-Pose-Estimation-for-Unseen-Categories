@@ -104,6 +104,7 @@ class CrossAttentionRefinementNet(nn.Module):
                 torch.cuda.empty_cache()
             else:
                 n0, n1 = int(self.cross_sampling_ratio * flat_coords0.shape[1]), int(self.cross_sampling_ratio * flat_coords1.shape[1])
+                n0 = 5000
                 idf0, idn0, dists0 = batch["shape1"]["sample_idx"]
                 #idf1, idn1, dists1 = batch["shape2"]["sample_idx"]
                 idf0, idn0, dists0 = idf0[:n0], idn0, dists0

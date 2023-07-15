@@ -1,20 +1,21 @@
 
 
 set_env_variables.data_root = "/home/morashed/repo/6D-Pose-Estimation-for-Unseen-Categories/sample-data"
-set_env_variables.render_data_name = "lm"
+set_env_variables.render_data_name = "lm1k"
 
-set_env_variables.cuda = False
+set_env_variables.cuda = True
 set_env_variables.device = '0'
 set_env_variables.checkpoint_interval = 5
 set_env_variables.log_interval =  1
 
 base_object_dataset.mode = 'train_pbr'
 base_object_dataset.num_samples = -1 
-base_object_dataset.min_vis = 0.5
+base_object_dataset.min_vis = 0.3
 
 base_object_dataset.cache_dir = '/home/morashed/repo'
 base_object_dataset.LBO_pc = True
 
+base_object_dataset.num_samples = 20
 
 yaml_read.path = "/home/morashed/repo/6D-Pose-Estimation-for-Unseen-Categories/config/dpfm_orig.yaml"
 DPFMNet.cfg = @yaml_read()
@@ -23,13 +24,13 @@ DPFMLoss.w_fmap =  1
 DPFMLoss.w_acc =  1
 DPFMLoss.w_nce =  1
 DPFMLoss.nce_t =  0.07 # 0.07
-DPFMLoss.nce_num_pairs =  512
+DPFMLoss.nce_num_pairs =  1024 #512
 
 
 train_net.model = @DPFMNet()
-Adam.lr = 0.0001
+Adam.lr = 0.001
 train_net.optimizer = @Adam
 train_net.criterion = @DPFMLoss()
-train_net.decay_iter =  5
+train_net.decay_iter =  500
 train_net.decay_factor = 0.5 
-train_net.epochs = 50
+train_net.epochs = 200

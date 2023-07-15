@@ -22,7 +22,7 @@ class DPFMNet(nn.Module):
         self.feature_extractor = DiffusionNet(
             C_in=cfg["fmap"]["C_in"],
             C_out=cfg["fmap"]["n_feat"],
-            C_width=128,
+            C_width=64,
             N_block=4,
             dropout=True,
             with_gradient_features=True,
