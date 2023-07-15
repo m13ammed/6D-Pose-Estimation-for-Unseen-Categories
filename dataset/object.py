@@ -11,7 +11,7 @@ import copy
 from sklearn.neighbors import BallTree
 from tqdm import tqdm # TIM STROHMEYER
 from DPFM.dpfm.utils import farthest_point_sample, square_distance
-
+import json
 @gin.configurable()
 class base_object_dataset(Dataset):
     def __init__(self, min_vis=0.25, cache_dir = '/home/morashed/repo', LBO_pc = True, **kwargs):
@@ -120,9 +120,9 @@ class base_object_dataset(Dataset):
                 pcd = pcd[idx0]
             gt_info = self.scenes[i]['scene_gt'][j]
 
-            model_folder = "models" if self.mode.lower() != 'test' else "models_eval"
+            model_folder = "models" if self.scenes.mode.lower() != 'test' else "models_eval"
             cad_path = Path(os.environ["data_root"]) / self.scenes.render_data_name/ model_folder/  f"obj_{gt_info['obj_id']:06d}.ply"
-
+            CAD_diam = json.load((Path(os.environ["data_root"]) / self.scenes.render_data_name/ model_folder/'models_info.json').open())[str(gt_info['obj_id'])]["diameter"]*0.1
             #load cad here or specifiy transform o3d.io.read_triangle_mesh
             obj_dict = {
                 'visib_fract':self.scenes[i]['scene_info'][j]['visib_fract'],
@@ -131,7 +131,8 @@ class base_object_dataset(Dataset):
                 'obj_id': gt_info['obj_id'],
                 'pcd_depth': pcd,
                 'cad_path': cad_path, 
-                'scale_cad': 0.1
+                'scale_cad': 0.1,
+                'diam_cad': CAD_diam
             } 
             if CAD_filename.exists() and cache: 
                 CAD_LBO_dict = dict(np.load(CAD_filename, allow_pickle=True))
@@ -145,7 +146,7 @@ class base_object_dataset(Dataset):
             align_pc = self.transform(pcd, obj_dict['R_m2c'], obj_dict['t_m2c'], inv=True) 
             #P = self.find_positives(CAD_ver, align_pc, r = 0.2)
             #p_new = np.argwhere(P)
-            p_new = self.find_positives(CAD_ver, align_pc, r = 0.5)
+            p_new = self.find_positives(CAD_ver, align_pc, r = obj_dict['diam_cad']*0.05)
             l2 = pcd.shape[0]
             l1 = CAD_ver.shape[0]
             overlap_12, overlap_21 = self.get_overlap(l1,l2,p_new)
@@ -159,8 +160,8 @@ class base_object_dataset(Dataset):
             if cache: np.savez(obj_filename, **obj_dict)
         if cache  :
             
-            base_name = f'min_vis_{self.min_vis}_'
-            CAD_filename = self.cache_dir / (base_name+ f'CAD_LBO_{obj_dict["obj_id"]}.npz')
+            #base_name = f'min_vis_{self.min_vis}_'
+            CAD_filename = self.cache_dir / (f'CAD_LBO_{obj_dict["obj_id"]}.npz')
 
         if CAD_filename.exists() and cache: 
             CAD_LBO_dict = dict(np.load(CAD_filename, allow_pickle=True))
