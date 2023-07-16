@@ -1,3 +1,6 @@
 [submodule "DPFM"]
 	path = DPFM
 	url = https://github.com/pvnieo/DPFM.git
+[submodule "TEASER-plusplus"]
+	path = TEASER-plusplus
+	url = https://github.com/MIT-SPARK/TEASER-plusplus.git
