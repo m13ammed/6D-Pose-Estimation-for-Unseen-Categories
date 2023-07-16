@@ -15,7 +15,7 @@ import json
 @gin.configurable()
 class base_object_dataset(Dataset):
     def __init__(self, min_vis=0.25, cache_dir = '/home/morashed/repo', LBO_pc = True, **kwargs):
-        self.scenes = base_scene_dataset(**kwargs)
+        self.scenes = base_scene_dataset(cache_dir=cache_dir, **kwargs)
         self.min_vis = min_vis
         self.cache_dir = cache_dir
         self.LBO_pc = LBO_pc
@@ -69,6 +69,7 @@ class base_object_dataset(Dataset):
             cache = True
             mapping_list_filename = self.cache_dir / 'mapping_list.npz'
         if mapping_list_filename.exists() and cache: 
+            print('loading mapping list cache')
             self.mapping_list = np.load(mapping_list_filename, allow_pickle=True)['mapping_list']
         else:
             #normal collecting
@@ -84,7 +85,9 @@ class base_object_dataset(Dataset):
                     else:
                         self.mapping_list.append((i,j))
             #saving mapping list cache
-            if cache: np.savez(mapping_list_filename, mapping_list=self.mapping_list)
+            if cache: 
+                print('saving mapping list cache')
+                np.savez(mapping_list_filename, mapping_list=self.mapping_list)
     
     def __getitem__(self, index):
         i,j = self.mapping_list[index]
