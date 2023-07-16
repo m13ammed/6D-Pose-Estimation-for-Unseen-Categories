@@ -4,10 +4,10 @@ import json
 import numpy as np
 from torch.utils.data import Dataset
 import os
-
+from tqdm import tqdm
 
 class base_scene_dataset(Dataset):
-    def __init__(self, mode = "train_pbr", split_txt = None, num_samples = -1, color = False):
+    def __init__(self, cache_dir = '/home/morashed/repo', mode = "train_pbr", split_txt = None, num_samples = -1, color = False):
         mode = mode.lower()
         if mode =='validation': mode = 'val'
         assert mode in ["train", "val", "test", "train_pbr"], "invalid mode, select train, val, or test"
@@ -17,6 +17,16 @@ class base_scene_dataset(Dataset):
         self.render_data_name = Path(os.environ["render_data_name"])
         self.render_data_path = self.data_root / self.render_data_name
         self.color = color
+        #cache part from obj.py
+        self.cache_dir = cache_dir
+        if self.cache_dir is not None:
+            self.cache_dir = Path(self.cache_dir)
+            self.cache_dir.mkdir(exist_ok=True)
+            self.cache_dir = self.cache_dir / self.render_data_name
+            self.cache_dir.mkdir(exist_ok=True)
+            self.cache_dir = self.cache_dir / self.mode
+            self.cache_dir.mkdir(exist_ok=True)
+        #
         if split_txt is None:
             self.collect_scenes()
         else:
@@ -49,32 +59,52 @@ class base_scene_dataset(Dataset):
         return exists
 
     def collect_scenes(self):
-        depth_path_gen = (self.render_data_path/self.mode).rglob('*/depth/*.png')
-        self.depth_path, self.camera_path, self.scene_info_path, self.seg_path, self.scene_gt_path = [], [], [], [], []
-        if self.color:
-            self.color_path = []
-        for depth_path in depth_path_gen:
-            camera_path = self.replace_directory(depth_path, 'scene_camera.json', drop_file= True)
-            scene_info_path = self.replace_directory(depth_path, 'scene_gt_info.json', drop_file= True)
-            scene_gt_path = self.replace_directory(depth_path, 'scene_gt.json', drop_file= True)
-            seg_path = self.replace_directory(depth_path, 'mask_visib', drop_suffix = True)
-            seg_path = sorted(list(seg_path.parent.glob(seg_path.parts[-1]+'_*.png')))
-            paths = [depth_path, camera_path, scene_info_path, scene_gt_path, seg_path]
-
+        #scene list cache
+        if self.cache_dir is not None:
+            cache = True
+            scene_list_filename = self.cache_dir / 'scene_list.npz'
+        if scene_list_filename.exists() and cache: 
+            print('loading scene cache')
+            scene_list = np.load(scene_list_filename, allow_pickle=True)
+            self.depth_path, self.camera_path, self.scene_info_path, self.seg_path, self.scene_gt_path = scene_list['depth_path'], scene_list['camera_path'], scene_list['scene_info_path'], scene_list['seg_path'], scene_list['scene_gt_path']
             if self.color:
-                color_path = self.replace_directory(depth_path, 'rgb').with_suffix('.jpg')
-                paths.append(color_path)
-            
-            paths_exist = self.check_exists(paths)
-
-            if paths_exist:
-                self.depth_path.append(depth_path)
-                self.camera_path.append(camera_path)
-                self.scene_info_path.append(scene_info_path)
-                self.scene_gt_path.append(scene_gt_path)
-                self.seg_path.append(seg_path)
+                    self.color_path = scene_list['color_path']
+        else:
+            #normal collecting
+            depth_path_gen = (self.render_data_path/self.mode).rglob('*/depth/*.png')
+            self.depth_path, self.camera_path, self.scene_info_path, self.seg_path, self.scene_gt_path = [], [], [], [], []
             if self.color:
-                self.color_path.append(color_path)
+                self.color_path = []
+            print('collecting scenes')
+            for depth_path in tqdm(depth_path_gen):
+                camera_path = self.replace_directory(depth_path, 'scene_camera.json', drop_file= True)
+                scene_info_path = self.replace_directory(depth_path, 'scene_gt_info.json', drop_file= True)
+                scene_gt_path = self.replace_directory(depth_path, 'scene_gt.json', drop_file= True)
+                seg_path = self.replace_directory(depth_path, 'mask_visib', drop_suffix = True)
+                seg_path = sorted(list(seg_path.parent.glob(seg_path.parts[-1]+'_*.png')))
+                paths = [depth_path, camera_path, scene_info_path, scene_gt_path, seg_path]
+
+                if self.color:
+                    color_path = self.replace_directory(depth_path, 'rgb').with_suffix('.jpg')
+                    paths.append(color_path)
+                
+                paths_exist = self.check_exists(paths)
+
+                if paths_exist:
+                    self.depth_path.append(depth_path)
+                    self.camera_path.append(camera_path)
+                    self.scene_info_path.append(scene_info_path)
+                    self.scene_gt_path.append(scene_gt_path)
+                    self.seg_path.append(seg_path)
+                if self.color:
+                    self.color_path.append(color_path)
+            #saving scene list cache
+            if cache: 
+                print('saving scene cache')
+                if self.color: 
+                    np.savez(scene_list_filename, depth_path=self.depth_path, camera_path=self.camera_path, scene_info_path=self.scene_info_path, seg_path=self.seg_path, scene_gt_path=self.scene_gt_path, color_path=self.color_path)
+                else:
+                    np.savez(scene_list_filename, depth_path=self.depth_path, camera_path=self.camera_path, scene_info_path=self.scene_info_path, seg_path=self.seg_path, scene_gt_path=self.scene_gt_path)
                     
     def __getitem__(self, idx):
 
