@@ -25,7 +25,7 @@ class DPFMNet(nn.Module):
             C_width=64,
             N_block=4,
             dropout=True,
-            with_gradient_features=True,
+            with_gradient_features=False,
             with_gradient_rotations=True,
         )
 
@@ -49,14 +49,14 @@ class DPFMNet(nn.Module):
         verts2, mass2, L2, evals2, evecs2, gradX2, gradY2 = (batch["shape2"]["xyz"], batch["shape2"]["mass"],
                                                                      batch["shape2"]["L"], batch["shape2"]["evals"], batch["shape2"]["evecs"],
                                                                      batch["shape2"]["gradX"], batch["shape2"]["gradY"])
-
+        L2, gradX2, gradY2 = None, None, None
         # set features to vertices
         features1, features2 = verts1, verts2
 
         feat1 = self.feature_extractor(features1, mass1, L=L1, evals=evals1, evecs=evecs1,
-                                       gradX=gradX1, gradY=gradY1, faces=faces1).unsqueeze(0)
+                                       gradX=gradX1, gradY=gradY1, faces=faces1)#.unsqueeze(0)
         feat2 = self.feature_extractor(features2, mass2, L=L2, evals=evals2, evecs=evecs2,
-                                       gradX=gradX2, gradY=gradY2).unsqueeze(0)
+                                       gradX=gradX2, gradY=gradY2)#.unsqueeze(0)
 
         # refine features
         ref_feat1, ref_feat2, overlap_score12, overlap_score21 = self.feat_refiner(verts1, verts2, feat1, feat2, batch)
@@ -64,10 +64,20 @@ class DPFMNet(nn.Module):
         # predict fmap
         torch.cuda.empty_cache()
         #evecs_trans1, evecs_trans2 = evecs1.t()[:self.n_fmap].cpu() @ torch.diag(mass1).cpu(), evecs2.t()[:self.n_fmap].cpu() @ torch.diag(mass2).cpu()
-        evecs_trans1 = torch.einsum('ij,i->ji', evecs1[:, :self.n_fmap], mass1)
-        evecs_trans2 = torch.einsum('ij,i->ji', evecs2[:, :self.n_fmap], mass2)
-
-        evals1, evals2 = evals1[:self.n_fmap], evals2[:self.n_fmap]
+        if evecs1.dim() ==3:
+            evecs_trans1, evecs_trans2 = [], []
+            for e1,m1,e2,m2 in zip(evecs1, mass1, evecs2, mass2):
+                evecs_trans1.append(torch.einsum('ij,i->ji', e1[:, :self.n_fmap], m1))
+                evecs_trans2.append(torch.einsum('ij,i->ji', e2[:, :self.n_fmap], m2))
+            evecs_trans1 = torch.stack(evecs_trans1)
+            evecs_trans2 = torch.stack(evecs_trans2)
+        else:
+            evecs_trans1 = torch.einsum('ij,i->ji', evecs1[:, :self.n_fmap], mass1)
+            evecs_trans2 = torch.einsum('ij,i->ji', evecs2[:, :self.n_fmap], mass2)
+        if evals1.dim ==1:
+            evals1, evals2 = evals1[:self.n_fmap], evals2[:self.n_fmap]
+        else:
+            evals1, evals2 = evals1[:,:self.n_fmap], evals2[:,:self.n_fmap]
         C_pred = self.fmreg_net(use_feat1, use_feat2, evals1, evals2, evecs_trans1, evecs_trans2)
 
         return C_pred, overlap_score12, overlap_score21, use_feat1, use_feat2, evecs_trans1, evecs_trans2
