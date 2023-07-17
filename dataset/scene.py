@@ -5,7 +5,7 @@ import numpy as np
 from torch.utils.data import Dataset
 import os
 from tqdm import tqdm
-
+import pickle
 class base_scene_dataset(Dataset):
     def __init__(self, cache_dir = '/home/morashed/repo', mode = "train_pbr", split_txt = None, num_samples = -1, color = False):
         mode = mode.lower()
@@ -62,13 +62,18 @@ class base_scene_dataset(Dataset):
         #scene list cache
         if self.cache_dir is not None:
             cache = True
-            scene_list_filename = self.cache_dir / 'scene_list.npz'
+            scene_list_filename = self.cache_dir / 'scene_list.pickle'
         if scene_list_filename.exists() and cache: 
             print('loading scene cache')
             scene_list = np.load(scene_list_filename, allow_pickle=True)
-            self.depth_path, self.camera_path, self.scene_info_path, self.seg_path, self.scene_gt_path = scene_list['depth_path'], scene_list['camera_path'], scene_list['scene_info_path'], scene_list['seg_path'], scene_list['scene_gt_path']
+            #self.depth_path, self.camera_path, self.scene_info_path, self.seg_path, self.scene_gt_path = scene_list['depth_path'], scene_list['camera_path'], scene_list['scene_info_path'], scene_list['seg_path'], scene_list['scene_gt_path']
+            with open(scene_list_filename, 'rb') as handle:
+                scene_list = pickle.load(handle)
+
             if self.color:
-                    self.color_path = scene_list['color_path']
+                self.depth_path, self.camera_path, self.scene_info_path, self.seg_path, self.scene_gt_path, self.color_path = scene_list
+            else:
+                self.depth_path, self.camera_path, self.scene_info_path, self.seg_path, self.scene_gt_path= scene_list
         else:
             #normal collecting
             depth_path_gen = (self.render_data_path/self.mode).rglob('*/depth/*.png')
@@ -96,15 +101,21 @@ class base_scene_dataset(Dataset):
                     self.scene_info_path.append(scene_info_path)
                     self.scene_gt_path.append(scene_gt_path)
                     self.seg_path.append(seg_path)
-                if self.color:
-                    self.color_path.append(color_path)
+                    if self.color:
+                        self.color_path.append(color_path)
             #saving scene list cache
             if cache: 
                 print('saving scene cache')
-                if self.color: 
-                    np.savez(scene_list_filename, depth_path=self.depth_path, camera_path=self.camera_path, scene_info_path=self.scene_info_path, seg_path=self.seg_path, scene_gt_path=self.scene_gt_path, color_path=self.color_path)
+                if self.color:
+                    with open(scene_list_filename, 'wb') as handle:
+                        pickle.dump([self.depth_path, self.camera_path, self.scene_info_path, self.seg_path, self.scene_gt_path, self.color_path], handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+                    #np.savez(scene_list_filename, depth_path=self.depth_path, camera_path=self.camera_path, scene_info_path=self.scene_info_path, seg_path=self.seg_path, scene_gt_path=self.scene_gt_path, color_path=self.color_path)
                 else:
-                    np.savez(scene_list_filename, depth_path=self.depth_path, camera_path=self.camera_path, scene_info_path=self.scene_info_path, seg_path=self.seg_path, scene_gt_path=self.scene_gt_path)
+                    with open(scene_list_filename, 'wb') as handle:
+                        pickle.dump([self.depth_path, self.camera_path, self.scene_info_path, self.seg_path, self.scene_gt_path], handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+                    #np.savez(scene_list_filename, depth_path=self.depth_path, camera_path=self.camera_path, scene_info_path=self.scene_info_path, seg_path=self.seg_path, scene_gt_path=self.scene_gt_path)
                     
     def __getitem__(self, idx):
 
