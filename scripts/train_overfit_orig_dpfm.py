@@ -128,7 +128,7 @@ def shape_to_device(dict_shape, device):
     for k, v in dict_shape.items():
         if "shape" in k:
             for name in names_to_device:
-                if name in v.keys():
+                if name in v.keys() and v[name] is not None:
                     v[name] = v[name].to(device)
             dict_shape[k] = v
         else:
@@ -140,6 +140,35 @@ def shape_to_device(dict_shape, device):
                 dict_shape[k] = v.to(device)
 
     return dict_shape
+def collate(data):
+    import numpy as np
+    CAD, PC, Obj = {},{},{}
+
+    for key in data[0][0].keys():
+        if isinstance(data[0][0][key], np.ndarray):
+            CAD.update({key : [torch.Tensor(d[0][key]) for d in data]})
+            CAD[key] = torch.nn.utils.rnn.pad_sequence(CAD[key], batch_first=True)
+        else:
+            CAD[key] = None #torch.nn.utils.rnn.pad_sequence(CAD[key], batch_first=True)
+            #CAD.update({key : [ torch.sparse_coo_tensor(idx, val, shape)   d[0][key] for d in data]})
+        
+
+    for key in data[0][2].keys():
+        if isinstance(data[0][2][key], np.ndarray) and data[0][2][key].size>1:
+            Obj.update({key : [torch.Tensor(d[2][key]) for d in data]})
+            Obj[key] = torch.nn.utils.rnn.pad_sequence(Obj[key], batch_first=True)
+        else:
+            Obj.update({key : [d[2][key] for d in data]})
+            #Obj[key] = torch.Tensor(Obj[key])
+
+    for key in data[0][1].keys():
+        if isinstance(data[0][1][key], np.ndarray):
+            PC.update({key : [torch.Tensor(d[1][key]) for d in data]})
+            PC[key] = torch.nn.utils.rnn.pad_sequence(PC[key], batch_first=True)
+        else:
+            PC[key] = None #torch.nn.utils.rnn.pad_sequence(CAD[key], batch_first=True)
+
+    return CAD, PC, Obj
 
 @gin.configurable()
 def train_net(model, criterion, optimizer, decay_iter, decay_factor, epochs):
@@ -156,7 +185,8 @@ def train_net(model, criterion, optimizer, decay_iter, decay_factor, epochs):
 
     # create dataset
     train_dataset = base_object_dataset()
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=None, shuffle=False)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=2, shuffle=True, collate_fn = collate, drop_last = True)
+    #train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=None, shuffle=False)
 
     # define model
     model = model.to(device)
@@ -175,7 +205,7 @@ def train_net(model, criterion, optimizer, decay_iter, decay_factor, epochs):
 
         model.train()
         for i, (CAD, PC, Obj) in enumerate(train_loader):
-            if Obj["obj_id"] >= 11 : continue
+            #if Obj["obj_id"] >= 11 : continue
             print("start training")
 
             batch = {
@@ -188,18 +218,18 @@ def train_net(model, criterion, optimizer, decay_iter, decay_factor, epochs):
             #data = augment_batch(data, rot_x=30, rot_y=30, rot_z=60, std=0.01, noise_clip=0.05, scale_min=0.9, scale_max=1.1)
 
             # prepare iteration data
-            map21 = Obj["P"]#[] #should be 21 confirm
+            map21 = Obj["P"].type(torch.int)#[] #should be 21 confirm
             gt_partiality_mask12, gt_partiality_mask21 = Obj["overlap_12"].to(device), Obj["overlap_21"].to(device)
             
             # do iteration
             C_pred, overlap_score12, overlap_score21, use_feat1, use_feat2, evecs_trans1, evecs_trans2 = model(batch)
             #C_gt = C_from_sparse_P(Obj["P"], PC["evecs"][:,:30], evecs_trans2) #data["C_gt"].unsqueeze(0)
-            C_gt = C_from_sparse_P(Obj["P"], CAD["evecs"][:,:30], PC["evecs"][:,:30]).unsqueeze(0) #data["C_gt"].unsqueeze(0)
-
+            #C_gt = C_from_sparse_P(Obj["P"], CAD["evecs"][:,:30], PC["evecs"][:,:30]).unsqueeze(0) #data["C_gt"].unsqueeze(0)
+            C_gt = torch.stack([C_from_sparse_P(p.type(torch.int), cad[:,:30], pc[:,:30]) for p,cad,pc in zip(Obj["P"], CAD["evecs"], PC["evecs"])])
             loss = criterion(C_gt, C_pred, map21, use_feat1, use_feat2,
                              overlap_score12, overlap_score21, gt_partiality_mask12, gt_partiality_mask21)
-            p_pred = fmap2pointmap(C_pred, CAD["evecs"][:,:30], PC["evecs"][:,:30])
-            score_I = compute_inlier_ratio(p_pred.t(), CAD['xyz'], Obj["align_pc"].to(device), 0.1*Obj['diam_cad'])
+            #p_pred = fmap2pointmap(C_pred, CAD["evecs"][:,:30], PC["evecs"][:,:30])
+            #score_I = compute_inlier_ratio(p_pred.t(), CAD['xyz'], Obj["align_pc"].to(device), 0.1*Obj['diam_cad'])
 
             loss.backward()
             optimizer.step()
@@ -209,41 +239,41 @@ def train_net(model, criterion, optimizer, decay_iter, decay_factor, epochs):
             # log
             iterations += 1
             if iterations % int(os.environ["log_interval"]) == 0:
-                print(f"#epoch:{epoch}, #batch:{i + 1}, #iteration:{iterations}, loss:{loss}, IR: {score_I}")
-                model.eval()
-        for i, (CAD, PC, Obj) in enumerate(train_loader):
-            if Obj["obj_id"] < 10 : continue
-
-            print("start training")
-
-            batch = {
-                "shape1":CAD,
-                "shape2":PC
-            } 
-            batch = shape_to_device(batch, device)
-            # prepare iteration data
-            map21 = Obj["P"]#[] #should be 21 confirm
-            gt_partiality_mask12, gt_partiality_mask21 = Obj["overlap_12"].to(device), Obj["overlap_21"].to(device)
-            
-            # do iteration
-            C_pred, overlap_score12, overlap_score21, use_feat1, use_feat2, evecs_trans1, evecs_trans2 = model(batch)
-            #C_gt = C_from_sparse_P(Obj["P"], PC["evecs"][:,:30], torch.linalg.pinv(CAD["evecs"][:,:30])) #data["C_gt"].unsqueeze(0)
-            #C_gt = C_from_sparse_P(Obj["P"], CAD["evecs"][:,:30], evecs_trans2).unsqueeze(0) #data["C_gt"].unsqueeze(0)
-            C_gt = C_from_sparse_P(Obj["P"], CAD["evecs"][:,:30], PC["evecs"][:,:30]).unsqueeze(0) #data["C_gt"].unsqueeze(0)
-
-            loss = criterion(C_gt, C_pred, map21, use_feat1, use_feat2,
-                            overlap_score12, overlap_score21, gt_partiality_mask12, gt_partiality_mask21)
-
-            #loss.backward()
-            #optimizer.step()
-            #optimizer.zero_grad()
-            p_pred = fmap2pointmap(C_pred, CAD["evecs"][:,:30], PC["evecs"][:,:30])
-            score_I = compute_inlier_ratio(p_pred.t(), CAD['xyz'], Obj["align_pc"].to(device), 0.1*Obj['diam_cad'])
-
-            # log
-            iterations += 1
-            if iterations % int(os.environ["log_interval"]) == 0:
-                print(f"#epoch:{epoch}, #batch:{i + 1}, #iteration:{iterations}, val loss:{loss}, IR: {score_I}")
+                print(f"#epoch:{epoch}, #batch:{i + 1}, #iteration:{iterations}, loss:{loss}")
+        #model.eval()
+        #for i, (CAD, PC, Obj) in enumerate(train_loader):
+        #    if Obj["obj_id"] < 10 : continue
+#
+        #    print("start training")
+#
+        #    batch = {
+        #        "shape1":CAD,
+        #        "shape2":PC
+        #    } 
+        #    batch = shape_to_device(batch, device)
+        #    # prepare iteration data
+        #    map21 = Obj["P"]#[] #should be 21 confirm
+        #    gt_partiality_mask12, gt_partiality_mask21 = Obj["overlap_12"].to(device), Obj["overlap_21"].to(device)
+        #    
+        #    # do iteration
+        #    C_pred, overlap_score12, overlap_score21, use_feat1, use_feat2, evecs_trans1, evecs_trans2 = model(batch)
+        #    #C_gt = C_from_sparse_P(Obj["P"], PC["evecs"][:,:30], torch.linalg.pinv(CAD["evecs"][:,:30])) #data["C_gt"].unsqueeze(0)
+        #    #C_gt = C_from_sparse_P(Obj["P"], CAD["evecs"][:,:30], evecs_trans2).unsqueeze(0) #data["C_gt"].unsqueeze(0)
+        #    C_gt = C_from_sparse_P(Obj["P"], CAD["evecs"][:,:30], PC["evecs"][:,:30]).unsqueeze(0) #data["C_gt"].unsqueeze(0)
+#
+        #    loss = criterion(C_gt, C_pred, map21, use_feat1, use_feat2,
+        #                    overlap_score12, overlap_score21, gt_partiality_mask12, gt_partiality_mask21)
+#
+        #    #loss.backward()
+        #    #optimizer.step()
+        #    #optimizer.zero_grad()
+        #    p_pred = fmap2pointmap(C_pred, CAD["evecs"][:,:30], PC["evecs"][:,:30])
+        #    score_I = compute_inlier_ratio(p_pred.t(), CAD['xyz'], Obj["align_pc"].to(device), 0.1*Obj['diam_cad'])
+#
+        #    # log
+        #    iterations += 1
+        #    if iterations % int(os.environ["log_interval"]) == 0:
+        #        print(f"#epoch:{epoch}, #batch:{i + 1}, #iteration:{iterations}, val loss:{loss}, IR: {score_I}")
 
         # save model
         #if (epoch + 1) % os.environ["checkpoint_interval"] == 0:

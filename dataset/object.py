@@ -27,7 +27,7 @@ class base_object_dataset(Dataset):
             self.cache_dir = self.cache_dir / self.scenes.mode
             self.cache_dir.mkdir(exist_ok=True)
         self.collect_obj_data()
-
+        self.num_samples = kwargs['num_samples']
     def remove_outliers(self, pcd): # TIM STROHMEYER
         '''
         nb_neighbors:   num of neighbors to calculate the average distance for a given point.
@@ -243,8 +243,10 @@ class base_object_dataset(Dataset):
 
         return CAD_LBO_dict, pcd_LBO_dict, obj_dict
     def __len__(self):
-
-        return len(self.mapping_list)
+        if self.num_samples > -1:
+            return (self.mapping_list[:,0]<self.num_samples).sum()
+        else:
+            return len(self.mapping_list)
 
     def find_positives(self, pc1, pc2, r=0.2):
         # Compute pairwise Euclidean distances between all pairs of points

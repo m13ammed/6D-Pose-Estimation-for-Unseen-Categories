@@ -59,7 +59,13 @@ class DPFMLoss(nn.Module):
         loss += acc_loss
 
         # nce loss
-        nce_loss = self.nce_softmax_loss(feat1, feat2, map21) * self.w_nce
+        if feat1.dim() ==3:
+            nce_loss = 0
+            m = feat1.shape[0]
+            for feat11, feat22, map212 in zip(feat1, feat2, map21):
+                nce_loss += self.nce_softmax_loss(feat11, feat22, map212) * self.w_nce * 1/m
+        else:
+            nce_loss = self.nce_softmax_loss(feat1, feat2, map21) * self.w_nce
         loss += nce_loss
 
         return loss

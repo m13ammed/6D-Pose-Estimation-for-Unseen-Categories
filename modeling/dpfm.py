@@ -96,7 +96,7 @@ class CrossAttentionRefinementNet(nn.Module):
         desc0, desc1 = self.first_lin(features_x).transpose(1, 2), self.first_lin(features_y).transpose(1, 2)
 
         for layer in self.layers:
-            flat_coords0, flat_coords1 = coords0.squeeze(0).t(), coords1.squeeze(0).t()
+            #flat_coords0, flat_coords1 = coords0.squeeze(0).t(), coords1.squeeze(0).t()
             if self.cross_sampling_ratio == 1:
                 desc0 = desc0 + layer(desc0, desc1)
                 torch.cuda.empty_cache()
@@ -161,14 +161,23 @@ class RegularizedFMNet(nn.Module):
 
     def forward(self, feat_x, feat_y, evals_x, evals_y, evecs_trans_x, evecs_trans_y):
         # compute linear operator matrix representation C1 and C2
-        evecs_trans_x, evecs_trans_y = evecs_trans_x.unsqueeze(0), evecs_trans_y.unsqueeze(0)
-        evals_x, evals_y = evals_x.unsqueeze(0), evals_y.unsqueeze(0)
+        if evecs_trans_x.dim ==2:
+            evecs_trans_x, evecs_trans_y = evecs_trans_x.unsqueeze(0), evecs_trans_y.unsqueeze(0)
+            evals_x, evals_y = evals_x.unsqueeze(0), evals_y.unsqueeze(0)
+        else: 
+            no_squeeze = True
 
         F_hat = torch.bmm(evecs_trans_x, feat_x)
         G_hat = torch.bmm(evecs_trans_y, feat_y)
         A, B = F_hat, G_hat
 
-        D = get_mask(evals_x.flatten(), evals_y.flatten(), self.resolvant_gamma, feat_x.device).unsqueeze(0)
+        if no_squeeze:
+            D = []
+            for ex,ey in zip(evals_x, evals_y):
+                D.append(get_mask(ex.flatten(),ey.flatten(), self.resolvant_gamma, feat_x.device))
+            D = torch.stack(D)
+        else:
+            D = get_mask(evals_x.flatten(), evals_y.flatten(), self.resolvant_gamma, feat_x.device).unsqueeze(0)
 
         A_t = A.transpose(1, 2)
         A_A_t = torch.bmm(A, A_t)
