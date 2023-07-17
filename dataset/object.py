@@ -189,7 +189,7 @@ class base_object_dataset(Dataset):
             CAD_frames, CAD_mass, CAD_L, CAD_evals, CAD_evecs, CAD_gradX, CAD_gradY = geometry.get_operators(verts=CAD_ver, faces=CAD_faces, normals=CAD_norm) #for future utilize cahcing add caching to reading of gt json 
 
             #hks replace xyz input for se3 invariance
-            CAD_hks = geometry.compute_hks_autoscale(CAD_evals, CAD_evecs, 16)
+            #CAD_hks = geometry.compute_hks_autoscale(CAD_evals, CAD_evecs, 16)
             
             CAD_LBO_dict = {
                 "frames" :  CAD_frames ,
@@ -202,7 +202,7 @@ class base_object_dataset(Dataset):
                 "gradX" :   CAD_gradX , 
                 "gradY" :   CAD_gradY ,
                 "L" : CAD_L,
-                "hks": CAD_hks,
+                #"hks": CAD_hks,
                 #"sample_idx": [idx0, idx1, dists]
 
             } 
@@ -220,7 +220,7 @@ class base_object_dataset(Dataset):
                 pcd_frames, pcd_mass, pcd_L, pcd_evals, pcd_evecs, pcd_gradX, pcd_gradY = geometry.get_operators(verts=torch.Tensor(obj_dict['pcd_depth']), faces=torch.Tensor([])) #for future utilize cahcing add caching to reading of gt json 
 
                 #hks replace xyz input for se3 invariance
-                pcd_hks = geometry.compute_hks_autoscale(pcd_evals, pcd_evecs, 16)
+                #pcd_hks = geometry.compute_hks_autoscale(pcd_evals, pcd_evecs, 16)
                 
                 pcd_LBO_dict = {
                     "frames" :  pcd_frames ,
@@ -231,7 +231,7 @@ class base_object_dataset(Dataset):
                     "gradX" :   pcd_gradX , 
                     "gradY" :   pcd_gradY,
                     "xyz" : obj_dict['pcd_depth'].astype(np.float32),
-                    "hks": pcd_hks
+                    #"hks": pcd_hks
 
                 }
                 if cache: 
