@@ -10,6 +10,7 @@ import gin
 import copy 
 from sklearn.neighbors import BallTree
 from tqdm import tqdm # TIM STROHMEYER
+import cv2 # TIM STROHMEYER
 from DPFM.dpfm.utils import farthest_point_sample, square_distance
 import json
 @gin.configurable()
@@ -40,13 +41,34 @@ class base_object_dataset(Dataset):
         pcd_03d.points = o3d.utility.Vector3dVector(pcd)
 
         # Statisticial Outlier removal
-        cl, ind = pcd_03d.remove_statistical_outlier(nb_neighbors=20, std_ratio=0.1)
+        cl, ind = pcd_03d.remove_statistical_outlier(nb_neighbors=20, std_ratio=0.3)
         inlier_cloud = pcd_03d.select_by_index(ind)
 
         # Convert Open3D.o3d.geometry.PointCloud to numpy array
         pcd_clean = np.asarray(inlier_cloud.points)
 
         return pcd_clean
+
+    def erode_seg_mask(self, mask, kernel_size): # TIM STROHMEYER
+
+        # turn boolean mask into binary mask
+        seg_mask = mask.astype(int) 
+        binary_matrix = seg_mask.astype(np.uint8) * 255
+   
+        # Taking a matrix of size 5 as the kernel
+        kernel = np.ones((kernel_size, kernel_size), np.uint8)
+        kernel[0, 0] = 0
+        kernel[-1, 0] = 0
+        kernel[0, -1] = 0
+        kernel[-1, -1] = 0
+        
+        # num of iterations determines how much to erode image.
+        img_erosion = cv2.erode(binary_matrix, kernel, iterations=1)
+
+        # convert binary back to boolean mask
+        img_erosion = img_erosion.astype(dtype=bool)
+
+        return img_erosion
 
     def dpt_2_pcld(self, dpt, cam_scale, K, mask):
         idx = np.indices(dpt.shape[:2])
@@ -55,6 +77,7 @@ class base_object_dataset(Dataset):
         if len(dpt.shape) > 2:
             dpt = dpt[:, :, 0]
         dpt = dpt.astype(np.float32) / cam_scale
+        mask = self.erode_seg_mask(mask, 3) # TIM STROHMEYER
         dpt = dpt[mask]
         #msk = (dpt > 1e-8).astype(np.float32)
         row = (ymap[mask] - K[0,2]) * dpt / K[0,0]
