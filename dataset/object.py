@@ -14,7 +14,7 @@ from DPFM.dpfm.utils import farthest_point_sample, square_distance
 import json
 @gin.configurable()
 class base_object_dataset(Dataset):
-    def __init__(self, min_vis=0.25, cache_dir = '/home/morashed/repo', LBO_pc = True, **kwargs):
+    def __init__(self, min_vis=0.25, cache_dir = '/home/morashed/repo', LBO_pc = True, obj_take = [],**kwargs):
         self.scenes = base_scene_dataset(cache_dir=cache_dir, **kwargs)
         self.min_vis = min_vis
         self.cache_dir = cache_dir
@@ -26,6 +26,7 @@ class base_object_dataset(Dataset):
             self.cache_dir.mkdir(exist_ok=True)
             self.cache_dir = self.cache_dir / self.scenes.mode
             self.cache_dir.mkdir(exist_ok=True)
+            self.obj_take = obj_take
         self.collect_obj_data()
         self.num_samples = kwargs['num_samples']
     def remove_outliers(self, pcd): # TIM STROHMEYER
@@ -39,7 +40,7 @@ class base_object_dataset(Dataset):
         pcd_03d.points = o3d.utility.Vector3dVector(pcd)
 
         # Statisticial Outlier removal
-        cl, ind = pcd_03d.remove_statistical_outlier(nb_neighbors=20, std_ratio=0.2)
+        cl, ind = pcd_03d.remove_statistical_outlier(nb_neighbors=20, std_ratio=0.1)
         inlier_cloud = pcd_03d.select_by_index(ind)
 
         # Convert Open3D.o3d.geometry.PointCloud to numpy array
@@ -67,10 +68,10 @@ class base_object_dataset(Dataset):
         #mapping list cache
         if self.cache_dir is not None:
             cache = True
-            mapping_list_filename = self.cache_dir / 'mapping_list.npz'
-        if mapping_list_filename.exists() and cache: 
+            self.mapping_list_filename = self.cache_dir / 'mapping_list.npz'
+        if self.mapping_list_filename.exists() and cache: 
             print('loading mapping list cache')
-            self.mapping_list = np.load(mapping_list_filename, allow_pickle=True)['mapping_list']
+            self.mapping_list = np.load(self.mapping_list_filename, allow_pickle=True)['mapping_list']
         else:
             #normal collecting
             CAD_mesh = None
@@ -82,12 +83,13 @@ class base_object_dataset(Dataset):
 
                     if obj['visib_fract'] < self.min_vis:
                         continue
+                    elif scene["scene_gt"][j]['obj_id'] not in self.obj_take and len(self.obj_take)>1: continue #2,3,4,6,7,8,9,12
                     else:
                         self.mapping_list.append((i,j))
             #saving mapping list cache
             if cache: 
                 print('saving mapping list cache')
-                np.savez(mapping_list_filename, mapping_list=self.mapping_list)
+                np.savez(self.mapping_list_filename, mapping_list=self.mapping_list)
     
     def __getitem__(self, index):
         i,j = self.mapping_list[index]
@@ -144,12 +146,12 @@ class base_object_dataset(Dataset):
             else:
 
                 CAD_mesh = o3d.io.read_triangle_mesh(str(cad_path))
-                CAD_mesh = CAD_mesh.simplify_quadric_decimation(10000)
+                CAD_mesh = CAD_mesh.simplify_quadric_decimation(7500)
                 CAD_ver =   np.asarray(CAD_mesh.vertices)*obj_dict['scale_cad'] #0.1
             align_pc = self.transform(pcd, obj_dict['R_m2c'], obj_dict['t_m2c'], inv=True) 
             #P = self.find_positives(CAD_ver, align_pc, r = 0.2)
             #p_new = np.argwhere(P)
-            p_new = self.find_positives(CAD_ver, align_pc, r = obj_dict['diam_cad']*0.05)
+            p_new = self.find_positives(CAD_ver, align_pc, r = obj_dict['diam_cad']*0.0115)
             l2 = pcd.shape[0]
             l1 = CAD_ver.shape[0]
             overlap_12, overlap_21 = self.get_overlap(l1,l2,p_new)
@@ -186,7 +188,7 @@ class base_object_dataset(Dataset):
 
             #dists, idx1 = dists[:, :, :130].clone(), idx1[:, :, :130].clone()
 
-            CAD_frames, CAD_mass, CAD_L, CAD_evals, CAD_evecs, CAD_gradX, CAD_gradY = geometry.get_operators(verts=CAD_ver, faces=CAD_faces, normals=CAD_norm) #for future utilize cahcing add caching to reading of gt json 
+            CAD_frames, CAD_mass, CAD_L, CAD_evals, CAD_evecs, CAD_gradX, CAD_gradY = geometry.get_operators(verts=CAD_ver, faces=CAD_faces, normals=CAD_norm, k_eig=64) #for future utilize cahcing add caching to reading of gt json 
 
             #hks replace xyz input for se3 invariance
             #CAD_hks = geometry.compute_hks_autoscale(CAD_evals, CAD_evecs, 16)
@@ -217,8 +219,13 @@ class base_object_dataset(Dataset):
                 pcd_LBO_dict = dict(np.load(pc_filename, allow_pickle=True))
                 pcd_LBO_dict = self.dict_to_tensor(pcd_LBO_dict, sparse_keys)
             else:
-                pcd_frames, pcd_mass, pcd_L, pcd_evals, pcd_evecs, pcd_gradX, pcd_gradY = geometry.get_operators(verts=torch.Tensor(obj_dict['pcd_depth']), faces=torch.Tensor([])) #for future utilize cahcing add caching to reading of gt json 
-
+                try:
+                    pcd_frames, pcd_mass, pcd_L, pcd_evals, pcd_evecs, pcd_gradX, pcd_gradY = geometry.get_operators(verts=torch.Tensor(obj_dict['pcd_depth']), faces=torch.Tensor([]), k_eig=64) #for future utilize cahcing add caching to reading of gt json 
+                except:
+                    self.mapping_list = np.delete(self.mapping_list,index, axis = 0)
+                    
+                    np.savez(self.mapping_list_filename, mapping_list=self.mapping_list)
+                    return 0 
                 #hks replace xyz input for se3 invariance
                 #pcd_hks = geometry.compute_hks_autoscale(pcd_evals, pcd_evecs, 16)
                 
@@ -244,31 +251,32 @@ class base_object_dataset(Dataset):
         return CAD_LBO_dict, pcd_LBO_dict, obj_dict
     def __len__(self):
         if self.num_samples > -1:
-            return (self.mapping_list[:,0]<self.num_samples).sum()
+            return (np.array(self.mapping_list)[:,0]<self.num_samples).sum()
         else:
             return len(self.mapping_list)
 
     def find_positives(self, pc1, pc2, r=0.2):
         # Compute pairwise Euclidean distances between all pairs of points
-        #distances = np.linalg.norm(pc1[:, np.newaxis] - pc2, axis=2)
+        distances = np.linalg.norm(pc1[:, np.newaxis] - pc2, axis=2)
 
         # Create a mask of points within the specified radius
-        #mask = distances <= r
+        mask = distances <= r
 
-        #return mask.astype(bool)
+        return np.argwhere(mask.astype(bool))
+
         
         #---------memory and speed optimized-----------------
         
         # Fit a BallTree model to pc2
-        tree = BallTree(pc2)
+        #tree = BallTree(pc2)
 
         # Find all points in pc1 that have a neighbor in pc2 within distance r
-        indices = tree.query_radius(pc1, r)
+        #indices = tree.query_radius(pc1, r)
 
         # Create a numpy array of pairs (i, j) where point i in pc1 is within distance r of point j in pc2
-        pairs = np.array([(i, j) for i, js in enumerate(indices) for j in js])
+        #pairs = np.array([(i, j) for i, js in enumerate(indices) for j in js])
 
-        return pairs
+        #return pairs
         
     def transform(self, pc, R, t, inv = False):
         if inv:
