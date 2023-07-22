@@ -7,14 +7,14 @@ import os
 from tqdm import tqdm
 import pickle
 class base_scene_dataset(Dataset):
-    def __init__(self, cache_dir = '/home/morashed/repo', mode = "train_pbr", split_txt = None, num_samples = -1, color = False):
+    def __init__(self, render_data_name, cache_dir = '/home/morashed/repo', mode = "train_pbr", split_txt = None, num_samples = -1, color = False):
         mode = mode.lower()
         if mode =='validation': mode = 'val'
         assert mode in ["train", "val", "test", "train_pbr"], "invalid mode, select train, val, or test"
 
         self.mode = mode
         self.data_root = Path(os.environ["data_root"])
-        self.render_data_name = Path(os.environ["render_data_name"])
+        self.render_data_name = Path(render_data_name)
         self.render_data_path = self.data_root / self.render_data_name
         self.color = color
         #cache part from obj.py
@@ -26,7 +26,7 @@ class base_scene_dataset(Dataset):
             self.cache_dir.mkdir(exist_ok=True)
             self.cache_dir = self.cache_dir / self.mode
             self.cache_dir.mkdir(exist_ok=True)
-        #
+        self.num_samples = num_samples
         if split_txt is None:
             self.collect_scenes()
         else:
@@ -76,11 +76,14 @@ class base_scene_dataset(Dataset):
                 self.depth_path, self.camera_path, self.scene_info_path, self.seg_path, self.scene_gt_path= scene_list
         else:
             #normal collecting
-            depth_path_gen = (self.render_data_path/self.mode).rglob('*/depth/*.png')
+            depth_path_gen = sorted(list((self.render_data_path/self.mode).rglob('*/depth/*.png')))#(self.render_data_path/self.mode).rglob('*/depth/*.png')
             self.depth_path, self.camera_path, self.scene_info_path, self.seg_path, self.scene_gt_path = [], [], [], [], []
             if self.color:
                 self.color_path = []
+                
+            
             print('collecting scenes')
+            ii = 0
             for depth_path in tqdm(depth_path_gen):
                 camera_path = self.replace_directory(depth_path, 'scene_camera.json', drop_file= True)
                 scene_info_path = self.replace_directory(depth_path, 'scene_gt_info.json', drop_file= True)
@@ -103,6 +106,8 @@ class base_scene_dataset(Dataset):
                     self.seg_path.append(seg_path)
                     if self.color:
                         self.color_path.append(color_path)
+                ii +=1
+                if ii== self.num_samples: break
             #saving scene list cache
             if cache: 
                 print('saving scene cache')

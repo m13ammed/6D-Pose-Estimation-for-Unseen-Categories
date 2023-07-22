@@ -15,21 +15,23 @@ import utils
 import gin
 import argparse
 
+from tqdm import tqdm
+
 def psuedo_collate(inputs):
 
     return 0
 if __name__ == '__main__':
     #gin.external_configurable(DPFMLoss)
     gin.external_configurable(torch.optim.Adam)
-    gin.parse_config_file('/home/morashed/repo/6D-Pose-Estimation-for-Unseen-Categories/config/cache_gen.gin')
+    gin.parse_config_file('./config/cache_gen.gin')
     utils.set_env_variables()
-    parser = argparse.ArgumentParser()
-    parser.add_argument('start_idx', type=int, help='Index for list slicing')
-    parser.add_argument('end_idx', type=int, help='Index for list slicing')
-
+    #parser = argparse.ArgumentParser()
+    #parser.add_argument('start_idx', type=int, help='Index for list slicing')
+    #parser.add_argument('end_idx', type=int, help='Index for list slicing')
+    torch.multiprocessing.set_start_method('spawn')
     dataset = base_object_dataset()
-    loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, num_workers = 0, collate_fn = psuedo_collate)
+    loader = torch.utils.data.DataLoader(dataset, batch_size=4, shuffle=False, num_workers = 4, collate_fn = psuedo_collate)
 
 
-    for batch in loader:
-        print(batch)
+    for i, batch in tqdm(enumerate(loader)):
+        print(i)

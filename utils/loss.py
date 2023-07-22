@@ -5,6 +5,14 @@ import gin
 import numpy as np
 import torch.nn.functional as F
 
+class FrobeniusLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, a, b):
+        loss = torch.sum((a - b) ** 2, axis=(1, 2))
+        loss = torch.clamp(loss, min=-1, max=1000)
+        return torch.mean(loss)
 
 class NCESoftmaxLoss(nn.Module):
     def __init__(self, nce_t, nce_num_pairs):
@@ -50,22 +58,42 @@ class DPFMLoss(nn.Module):
         loss = 0
 
         # fmap loss
+        #C12 = F.normalize(C12, p=2, dim=(1,2))
+        #C_gt = F.normalize(C_gt, p=2, dim=(1,2))
+
         fmap_loss = self.frob_loss(C12, C_gt) * self.w_fmap
         loss += fmap_loss
 
         # overlap loss
-        acc_loss = self.binary_loss(overlap_score12, gt_partiality_mask12.float()) * self.w_acc
-        acc_loss += self.binary_loss(overlap_score21, gt_partiality_mask21.float()) * self.w_acc
-        loss += acc_loss
 
         # nce loss
         if feat1.dim() ==3:
             nce_loss = 0
+            acc_loss = 0
+            #fmap_loss = 0
+            if overlap_score12.dim() ==1:
+                overlap_score12 = overlap_score12.unsqueeze(0)
+                overlap_score21 = overlap_score21.unsqueeze(0)
             m = feat1.shape[0]
-            for feat11, feat22, map212 in zip(feat1, feat2, map21):
-                nce_loss += self.nce_softmax_loss(feat11, feat22, map212) * self.w_nce * 1/m
+            for feat11, feat22, map212, o1, gtp1, o2, gtp2 in zip(feat1, feat2, map21,overlap_score12, gt_partiality_mask12.float(), overlap_score21, gt_partiality_mask21.float()):
+                nce_loss += self.nce_softmax_loss(feat11, feat22, torch.Tensor(map212).type(torch.int)) * self.w_nce * 1/m
+
+                acc_loss += self.binary_loss(o1, gtp1) * self.w_acc  * 1/m
+                acc_loss += self.binary_loss(o2, gtp2) * self.w_acc  * 1/m
+            loss += acc_loss
+            loss += nce_loss
+
         else:
             nce_loss = self.nce_softmax_loss(feat1, feat2, map21) * self.w_nce
-        loss += nce_loss
 
-        return loss
+            acc_loss = self.binary_loss(overlap_score12, gt_partiality_mask12.float()) * self.w_acc
+            acc_loss += self.binary_loss(overlap_score21, gt_partiality_mask21.float()) * self.w_acc
+            loss += acc_loss
+
+            loss += nce_loss
+
+        return loss, {"nce_loss":nce_loss.item(),
+                      "acc_loss":acc_loss.item(),
+                      "fmap_loss":fmap_loss.item(),
+                      "loss":loss.item()
+                        }

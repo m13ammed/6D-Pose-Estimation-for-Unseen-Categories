@@ -169,12 +169,12 @@ class base_object_dataset(Dataset):
             else:
 
                 CAD_mesh = o3d.io.read_triangle_mesh(str(cad_path))
-                CAD_mesh = CAD_mesh.simplify_quadric_decimation(7500)
+                CAD_mesh = CAD_mesh.simplify_quadric_decimation(10000)
                 CAD_ver =   np.asarray(CAD_mesh.vertices)*obj_dict['scale_cad'] #0.1
             align_pc = self.transform(pcd, obj_dict['R_m2c'], obj_dict['t_m2c'], inv=True) 
             #P = self.find_positives(CAD_ver, align_pc, r = 0.2)
             #p_new = np.argwhere(P)
-            p_new = self.find_positives(CAD_ver, align_pc, r = obj_dict['diam_cad']*0.0115)
+            p_new = self.find_positives(CAD_ver, align_pc, r = obj_dict['diam_cad']*0.012)
             l2 = pcd.shape[0]
             l1 = CAD_ver.shape[0]
             overlap_12, overlap_21 = self.get_overlap(l1,l2,p_new)
