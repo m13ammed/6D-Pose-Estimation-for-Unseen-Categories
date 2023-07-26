@@ -1,14 +1,42 @@
+'''
+                        -------------- TEASER++ registration Evaluation Script ---------------    
+                                                
+                                                Author: Tim Strohmeyer
+                                                Date: 25. July 2023 
+                                                Project: 6D Pose Estimation of Unseen Categories   
+
+
+This script performs 3D registration using TEASER++ to estimate the poses based on the predicted point2point Correspondence 
+Matrix, as well as evaluates the pose restuls in terms of ADD, ADDs and percentage of correct poses. 
+The scripts:
+1. loads the resulting data files (.pt) from the DPFM pipeline 
+2. loads the predicted Correspondence Matrix (P_red)
+3. restructures the correspondences into TEASER++ readible format (src, dst) by replacing the indices with corresponding 
+   coordinates.
+4. runs TEASER++ registration (pose estimation)
+5. Evaluates pose based on ADD, ADDs, 
+6. runs ICP to improve estimated pose further
+7. Reevaluates pose based on ADD, ADDs
+8. Computes the average scores per object ID
+9. Computes transformations on CAD and Point CLouds and writes them to ply files
+10. Writes results into "result_poses_TEASER" folder of structure:
+   result_poses_TEASER
+     -> ply
+        -> obj_[obj_id]_result_[index]  
+          -> cad_[index]_pose_est.ply: CAD vertices trasnformed by TEASER+ICP estimated Pose
+          -> cad_[index]_pose_gt.ply:  CAD vertices trasnformed by TEASER+ICP ground truth Pose
+          -> cad_[index].ply:          CAD vertices
+          -> pc_[index].ply:           partial Point Cloud
+     -> results
+       -> obj_[obj_id]_result_[index].txt: txt files containing evaluated scores 
+     -> avg_results.txt: txt files containing average evaluated scores per object class   
+'''
+
 import os
 import numpy as np
 import open3d as o3d
 import gin
 import sys 
-from dataset.object import base_object_dataset
-from utils import utils
-from sklearn.neighbors import KDTree
-from scipy.linalg import logm
-from tqdm import tqdm
-
 import copy
 import time
 import numpy as np
@@ -17,12 +45,13 @@ import teaserpp_python
 import torch
 import json
 import statistics
-from numpy import linalg as LA
 
-NOISE_BOUND = 0.05
-N_OUTLIERS = 1700
-OUTLIER_TRANSLATION_LB = 5
-OUTLIER_TRANSLATION_UB = 10
+from numpy import linalg as LA
+from dataset.object import base_object_dataset
+from utils import utils
+from sklearn.neighbors import KDTree
+from scipy.linalg import logm
+from tqdm import tqdm
 
 def create_named_lists(n, score):
     lists_container = {}
@@ -279,15 +308,22 @@ def calculate_and_write_averages_to_txt(result_lists_add, output_file):
         for key, avg in averages.items():
             txt_file.write(f"{key}: {avg}\n")
 
+# Teaser Parameters
+NOISE_BOUND = 0.05
+N_OUTLIERS = 1700
+OUTLIER_TRANSLATION_LB = 5
+OUTLIER_TRANSLATION_UB = 10
+
 if __name__ == "__main__":
     print("==================================================")
     print("              TEASER++ registration               ")
     print("==================================================")
     
-    # load all data from initial_synth
+    # load data
     directory_path = 'currrent_best_real_new'
     loaded_models = [] # 16 items
 
+    # Sort loaded data
     path = sorted(os.listdir(directory_path))
     #path.sort()
     for filename in path:
