@@ -320,6 +320,9 @@ if __name__ == "__main__":
     print("==================================================")
     
     # load data
+    # set directory path of .pt files for evaluation 
+    # --> download result data (.pt files) from server using:
+    # TERMINAL: scp -r unseen_object@131.159.10.67:/data/unseen_object_data/tmp/results/currrent_best_real_new/ /local/directory/
     directory_path = 'currrent_best_real_new'
     loaded_models = [] # 16 items
 
@@ -331,8 +334,6 @@ if __name__ == "__main__":
             file_path = os.path.join(directory_path, filename)
             loaded_model = torch.load(file_path)
             loaded_models.append(loaded_model)
-    
-    print(path)
 
     # Populating the parameters
     solver_params = teaserpp_python.RobustRegistrationSolver.Params()
