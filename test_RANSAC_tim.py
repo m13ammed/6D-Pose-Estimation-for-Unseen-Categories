@@ -1,13 +1,13 @@
 '''
-                        -------------- RASNAC registration Evaluation Script ---------------    
+                        -------------- RANSAC registration Evaluation Script ---------------    
                                                 
                                             Author: Tim Strohmeyer
                                             Date: 25. July 2023 
                                             Project: 6D Pose Estimation of Unseen Categories   
 
-This script performs 3D registration using RASNAC to estimate the poses based on the predicted point2point Correspondence 
+This script performs 3D registration using RANSAC to estimate the poses based on the predicted point2point Correspondence 
 Matrix, as well as evaluates the pose restuls in terms of ADD, ADDs and percentage of correct poses. 
-The scripts:
+The script:
 1. loads the resulting data files (.pt) from the DPFM pipeline 
 2. loads the predicted Correspondence Matrix (P_red)
 3. restructures the correspondences into RANSAC readible format
@@ -307,7 +307,10 @@ if __name__ == "__main__":
     print("==================================================")
 
     # load all data from initial_synth
-    directory_path = 'initial_synth_4'
+    # set directory path of .pt files for evaluation 
+    # --> download result data (.pt files) from server using:
+    # TERMINAL: scp -r unseen_object@131.159.10.67:/data/unseen_object_data/tmp/results/initial_synth_4/ /local/directory/
+    directory_path = 'initial_synth_4' 
     loaded_models = [] # 125 items
 
     path = sorted(os.listdir(directory_path))
@@ -316,8 +319,6 @@ if __name__ == "__main__":
             file_path = os.path.join(directory_path, filename)
             loaded_model = torch.load(file_path)
             loaded_models.append(loaded_model)
-    
-    # print(path)
 
     #check if results_poses_RANSAC directory exists
     isExist = os.path.exists("results_poses_RANSAC")
@@ -459,12 +460,10 @@ if __name__ == "__main__":
         error_deg = rad_2_deg(error_rad)
 
         # Write results to txt
-       
         write_results_to_txt("results_poses_RANSAC/results/obj_{}_result_{}.txt".format(obj_id, i), obj_id,  ir, correspondences, add_score, score, HybridPose_add_score, adds_score, add_score_ICP, add_score_ICP, HybridPose_add_score_ICP, adds_score_ICP,
                       T_gt, T_est, reg_p2p.transformation, error_cm, error_deg)
         
         # Write ply files
-
         #check if results_poses_RANSAC/ply/i directory exists
         isExist = os.path.exists("results_poses_RANSAC/ply/obj_{}_result_{}".format(obj_id, i))
         if not isExist:
