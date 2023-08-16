@@ -1,8 +1,8 @@
+import torch
+from torch.utils.tensorboard import SummaryWriter
 #import gin
 import sys 
 import os
-import torch
-from torch.utils.tensorboard import SummaryWriter
 if '__file__' in vars():
     print("We are running the script non interactively")
     path = os.path.join(os.path.dirname(__file__), os.pardir)
