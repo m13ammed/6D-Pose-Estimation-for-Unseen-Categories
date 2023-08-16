@@ -1,3 +1,4 @@
+![alt text](resources/pipeline.png)
 # 6D-Pose-Estimation-for-Unseen-Categories
 
 Welcome to the forefront of exploration in 6D pose estimation. This project ventures into uncharted territory, delving into the realm of functional mapping to expand the boundaries of 6D pose estimation across previously unseen object categories. The project's nucleus lies in constructing globally-informed correspondences using learned functional mapping, with a grand objective of enabling the estimation of 6D poses for entirely novel objects and categories. This trailblazing approach aims to redefine the benchmarks of 6D pose estimation, ushering in an era of heightened precision and adaptability that transcends conventional constraints.
@@ -78,11 +79,29 @@ mesh:
 ```python
 draw_basis(verts, faces, evecs, output="mesh_basis.png", evecs_selection=range(25,30), crop=[0.2, 0.1, 0.2, 0])
 ```
+
 point cloud:
-```bash
+```python
 draw_basis(verts, None, evecs, output="cloud_basis.png", evecs_selection=range(25,30), crop=[0.2, 0.1, 0.2, 0])
+```
+![alt text](resources/cat_basis.png)
+
+```python
 
 draw_features(CAD, PC, Obj, C_pred[0], overlap_score12, overlap_score21, use_feat1[0], use_feat2[0], offset=[0,-18,0]) #assume input has no batch dim
-
+```
+![alt text](resources/cat_feat.png)
+```python
 draw_correspondence(p_pred, Obj, offset=None, raw_CAD_down_sample=10000, models_path=None)
 ```
+![alt text](resources/cat_corr.png)
+
+## Acknowledgement
+
+We would like the authors of the followig repos as our repo benifited from them:
+
+https://github.com/pvnieo/DPFM
+
+https://github.com/huangjh-pub/synorim
+
+https://github.com/MIT-SPARK/TEASER-plusplus
