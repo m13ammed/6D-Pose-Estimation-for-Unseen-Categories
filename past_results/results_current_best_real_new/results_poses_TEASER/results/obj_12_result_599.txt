@@ -1,0 +1,28 @@
+Object ID: 12
+Inlier ration of P_pred: 0.0
+Num. of correspondences: 212
+Avg. Euclidean Distance (ADD) [cm]: 8.859691246646431
+Add Score thres: 0
+Add Score thres (xyz direction): 0.0
+Add-S Score: 1.0
+Avg. Euclidean Distance (ADD) ICP: 8.927301366617051
+Add Score ICP thres: 8.927301366617051
+Add Score ICP thres (xyz direction): 0.0
+Add-S Score ICP: 1.0
+Error [cm]: 6.301915282828161
+Error [deg]: 138.83533398746346
+T_gt (Ground Truth Transformation):
+[[ 4.31925e-01  8.97913e-01 -8.62111e-02 -1.50078e-01]
+ [ 3.37702e-01 -2.49580e-01 -9.07718e-01  7.28281e+00]
+ [-8.36472e-01  3.62904e-01 -4.10986e-01  9.08693e+01]
+ [ 0.00000e+00  0.00000e+00  0.00000e+00  1.00000e+00]]
+T_pred (Predicted Transformation):
+[[ 4.06090655e-01 -8.14507784e-01  4.14327709e-01  2.10850358e+00]
+ [-6.80398067e-01 -5.72162833e-01 -4.57917200e-01  7.27630390e+00]
+ [ 6.10040039e-01 -9.59518766e-02 -7.86539502e-01  9.66775773e+01]
+ [ 0.00000000e+00  0.00000000e+00  0.00000000e+00  1.00000000e+00]]
+T_pred_ICP (Predicted Transformation from ICP):
+[[ 3.85255930e-01 -8.29635180e-01  4.04083328e-01  2.08846537e+00]
+ [-6.87089246e-01 -5.50195133e-01 -4.74545765e-01  7.19978250e+00]
+ [ 6.16024542e-01 -9.48197393e-02 -7.81999349e-01  9.67596452e+01]
+ [ 0.00000000e+00  0.00000000e+00  0.00000000e+00  1.00000000e+00]]
