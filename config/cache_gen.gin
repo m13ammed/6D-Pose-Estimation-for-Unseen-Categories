@@ -1,11 +1,15 @@
 
 
-set_env_variables.data_root = "/home/morashed/repo/6D-Pose-Estimation-for-Unseen-Categories/sample-data"
-set_env_variables.render_data_name = "lm1k"
+set_env_variables.data_root = "/data/unseen_object_data/tmp/full_dataset_setup" 
+base_object_dataset.render_data_name = "lmo"
 
-base_object_dataset.mode = 'train_pbr'
-base_object_dataset.num_samples = -1 
+set_env_variables.BS =  8  #batch size
+set_env_variables.num_workers = 12
+
+
+base_object_dataset.mode = 'test'
+base_object_dataset.num_samples = 1000
 base_object_dataset.min_vis = 0.3
 
-base_object_dataset.cache_dir = '/home/morashed/repo'
+base_object_dataset.cache_dir = '/data/unseen_object_data/tmp/cache_new'
 base_object_dataset.LBO_pc = True

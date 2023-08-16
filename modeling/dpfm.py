@@ -166,6 +166,8 @@ class RegularizedFMNet(nn.Module):
             evals_x, evals_y = evals_x.unsqueeze(0), evals_y.unsqueeze(0)
         else: 
             no_squeeze = True
+        #feat_x = F.normalize(feat_x, p=2, dim=-1)
+        #feat_y = F.normalize(feat_y, p=2, dim=-1)
 
         F_hat = torch.bmm(evecs_trans_x, feat_x)
         G_hat = torch.bmm(evecs_trans_y, feat_y)

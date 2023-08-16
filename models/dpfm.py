@@ -23,12 +23,11 @@ class DPFMNet(nn.Module):
             C_in=cfg["fmap"]["C_in"],
             C_out=cfg["fmap"]["n_feat"],
             C_width=64,
-            N_block=4,
-            dropout=True,
+            N_block=2,
+            dropout=False,
             with_gradient_features=False,
             with_gradient_rotations=True,
         )
-
         # cross attention refinement
         
         self.feat_refiner = CrossAttentionRefinementNet(n_in=cfg["fmap"]["n_feat"], num_head=cfg["attention"]["num_head"], gnn_dim=cfg["attention"]["gnn_dim"],
@@ -51,7 +50,7 @@ class DPFMNet(nn.Module):
                                                                      batch["shape2"]["gradX"], batch["shape2"]["gradY"])
         L2, gradX2, gradY2 = None, None, None
         # set features to vertices
-        features1, features2 = verts1, verts2
+        features1, features2 = (verts1-110)/50, (verts2-110)/50 #orch.nn.functional.normalize(verts2, p=2, dim = -1)
 
         feat1 = self.feature_extractor(features1, mass1, L=L1, evals=evals1, evecs=evecs1,
                                        gradX=gradX1, gradY=gradY1, faces=faces1)#.unsqueeze(0)
@@ -80,4 +79,4 @@ class DPFMNet(nn.Module):
             evals1, evals2 = evals1[:,:self.n_fmap], evals2[:,:self.n_fmap]
         C_pred = self.fmreg_net(use_feat1, use_feat2, evals1, evals2, evecs_trans1, evecs_trans2)
 
-        return C_pred, overlap_score12, overlap_score21, use_feat1, use_feat2, evecs_trans1, evecs_trans2
+        return C_pred, overlap_score12, overlap_score21, use_feat1, use_feat2, ref_feat1, ref_feat2

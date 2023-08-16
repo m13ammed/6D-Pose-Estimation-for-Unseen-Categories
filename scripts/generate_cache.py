@@ -21,16 +21,17 @@ def psuedo_collate(inputs):
 
     return 0
 if __name__ == '__main__':
-    #gin.external_configurable(DPFMLoss)
-    gin.external_configurable(torch.optim.Adam)
-    gin.parse_config_file('./config/cache_gen.gin')
+
+    try:
+        gin.parse_config_file('./config/cache_gen.gin')
+    except:
+        gin.parse_config_file('../config/cache_gen.gin')
+
     utils.set_env_variables()
-    #parser = argparse.ArgumentParser()
-    #parser.add_argument('start_idx', type=int, help='Index for list slicing')
-    #parser.add_argument('end_idx', type=int, help='Index for list slicing')
+
     torch.multiprocessing.set_start_method('spawn')
     dataset = base_object_dataset()
-    loader = torch.utils.data.DataLoader(dataset, batch_size=4, shuffle=False, num_workers = 4, collate_fn = psuedo_collate)
+    loader = torch.utils.data.DataLoader(dataset, batch_size=int(os.environ["BS"]), shuffle=False, num_workers = num_workers = int(os.environ["num_workers"]), collate_fn = psuedo_collate)
 
 
     for i, batch in tqdm(enumerate(loader)):

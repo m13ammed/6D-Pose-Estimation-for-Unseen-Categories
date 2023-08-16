@@ -2,6 +2,7 @@ import os
 import gin
 import numpy as np
 import yaml 
+import torch 
 
 @gin.configurable
 def set_env_variables(**kwargs):
@@ -53,3 +54,52 @@ def quaternion_rotation_matrix(Q):
 @gin.configurable
 def yaml_read(path):
     return yaml.safe_load(open(path, "r"))
+
+@gin.configurable()
+def prepare_train_datasets(datasets_list):
+    if len(datasets_list) == 1 :
+        return datasets_list[0]()
+    else:
+        new_list = [dataset() for dataset in datasets_list]
+        return torch.utils.data.ConcatDataset(new_list)
+
+
+def C_from_sparse_P(P, evecs1, evecs2):
+    '''vts1, vts2 is a list of correspondeing point pair indexes
+    this should be the general form of solving for functional mappings
+    return the optimal functional mapping between two shapes
+    intuition(my word): given the specified landmark correspondences, solve for the best fitted FM under those constraints
+    
+    xieyizheng
+    '''
+    #align the two basis
+    evec_1_a, evec_2_a = evecs1[P[:,0]], evecs2[P[:,1]]
+    #solve the linear system: AX = B, phi_2_a @ C = phi_1_a, aligned_number_of_pointsx50, 50x50 = aligned_number_of_pointsx50
+    C_gt = torch.linalg.lstsq(evec_2_a, evec_1_a)[0][:evec_1_a.size(-1)]
+    #this is the best functional mapping given the provided p2p corredpondence information
+    return C_gt
+def compute_inlier_ratio(pred_corr, CAD, PC_aligned, threshold):
+    ''' given predicted correspondences, calculate inlier ratio. 
+        input corr should be list of index pairs
+
+general definition (def from geo tranformer):
+        Inlier Ratio (IR) is the fraction of inlier matches among all putative point matches. 
+        A match is considered as an inlier if the distance between the two points is smaller than thredhold = 10cm under the ground-truth transformation T
+
+special case for us:
+        if threshold is set to be the same for both gt corr and inlier ratio, then this function holds, otherwise should use a more general formulatoin.
+
+    '''
+    
+    total_corr = len(pred_corr)
+    if total_corr == 0: return 0
+
+    CAD = CAD[pred_corr[:,0]]
+    PC_aligned = PC_aligned[pred_corr[:,1]]
+
+    sq_dist = torch.square(CAD - PC_aligned).sum(-1) ** 0.5
+
+    inliers = (sq_dist<(threshold)).sum()
+    inlier_ratio = inliers / total_corr
+
+    return inlier_ratio

@@ -1,4 +1,3 @@
-# fmap module params
 fmap:
   n_fmap: 30  # number of eigenvectors used for fmap
   k_eig: 64  # number of eigenvectors used for diffusion
@@ -19,5 +18,4 @@ attention:
 # overlap module
 overlap:
   overlap_feat_dim: 32
-
 

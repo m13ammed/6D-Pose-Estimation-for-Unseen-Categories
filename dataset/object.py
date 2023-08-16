@@ -85,7 +85,7 @@ class base_object_dataset(Dataset):
         dpt_3d = np.concatenate(
             (row[..., None], col[..., None], dpt[..., None]), axis=1
         )
-        return dpt_3d
+        return dpt_3d *100
 
     def collect_obj_data(self):
         #mapping list cache
@@ -140,7 +140,7 @@ class base_object_dataset(Dataset):
             K = np.array(scene["camera"]["cam_K"]).reshape(3,3)
             cam_scale = scene["camera"]["depth_scale"]
 
-            pcd = self.dpt_2_pcld(depth.T, cam_scale*1000, K, seg_mask)
+            pcd = self.dpt_2_pcld(depth.T, 1000/cam_scale, K, seg_mask) 
             pcd = self.remove_outliers(pcd) # TIM STROHMEYER
             if pcd.shape[0]>2000:
                 ratio = 2000/pcd.shape[0]
@@ -148,7 +148,7 @@ class base_object_dataset(Dataset):
                 pcd = pcd[idx0]
             gt_info = self.scenes[i]['scene_gt'][j]
 
-            model_folder = "models" if self.scenes.mode.lower() != 'test' else "models_eval"
+            model_folder = "models"# if self.scenes.mode.lower() != 'test' else "models_eval"
             cad_path = Path(os.environ["data_root"]) / self.scenes.render_data_name/ model_folder/  f"obj_{gt_info['obj_id']:06d}.ply"
             CAD_diam = json.load((Path(os.environ["data_root"]) / self.scenes.render_data_name/ model_folder/'models_info.json').open())[str(gt_info['obj_id'])]["diameter"]*0.1
             #load cad here or specifiy transform o3d.io.read_triangle_mesh
@@ -174,7 +174,7 @@ class base_object_dataset(Dataset):
             align_pc = self.transform(pcd, obj_dict['R_m2c'], obj_dict['t_m2c'], inv=True) 
             #P = self.find_positives(CAD_ver, align_pc, r = 0.2)
             #p_new = np.argwhere(P)
-            p_new = self.find_positives(CAD_ver, align_pc, r = obj_dict['diam_cad']*0.012)
+            p_new = self.find_positives(CAD_ver, align_pc, r = obj_dict['diam_cad']*0.05)
             l2 = pcd.shape[0]
             l1 = CAD_ver.shape[0]
             overlap_12, overlap_21 = self.get_overlap(l1,l2,p_new)
@@ -184,7 +184,7 @@ class base_object_dataset(Dataset):
                 'overlap_12':overlap_12,
                 'overlap_21': overlap_21,
             })
-
+            #print(len(p_new))
             if cache: np.savez(obj_filename, **obj_dict)
         if cache  :
             
