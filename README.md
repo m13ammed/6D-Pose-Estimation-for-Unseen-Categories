@@ -74,12 +74,15 @@ cd scripts && python test_teaser_.py <path to the generated .pt results folder> 
 We additionally provide functions for visualizations in the scripts/visualization.py file:
 (Note: requires desktop env by the visualizer)
 
-###mesh
+mesh:
+```python
 draw_basis(verts, faces, evecs, output="mesh_basis.png", evecs_selection=range(25,30), crop=[0.2, 0.1, 0.2, 0])
-
-###point cloud
+```
+point cloud:
+```bash
 draw_basis(verts, None, evecs, output="cloud_basis.png", evecs_selection=range(25,30), crop=[0.2, 0.1, 0.2, 0])
 
 draw_features(CAD, PC, Obj, C_pred[0], overlap_score12, overlap_score21, use_feat1[0], use_feat2[0], offset=[0,-18,0]) #assume input has no batch dim
 
 draw_correspondence(p_pred, Obj, offset=None, raw_CAD_down_sample=10000, models_path=None)
+```
